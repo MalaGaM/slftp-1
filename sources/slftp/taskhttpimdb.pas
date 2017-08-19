@@ -1,4 +1,4 @@
-﻿unit taskhttpimdb;
+unit taskhttpimdb;
 
 interface
 
@@ -42,10 +42,12 @@ var
   imdbdata: TDbImdbData;
   rr, rr2: TRegexpr;
   imdb_mtitle, imdb_extra, imdb_date, s, imdb_counline, imdb_country, rlang,
-    imdb_genr, imdb_countr, imdb_lang, imdb_region: AnsiString;
+    imdb_genr, imdb_countr, imdb_lang, imdb_region, bom_date: AnsiString;
   ir: TImdbRelease;
 
   mainsite, rlsdatesite, businesssite: AnsiString;
+  release_date: TDateTime;
+  formatSettings: TFormatSettings;
 begin
   Result:=False;
 
@@ -351,7 +353,7 @@ begin
     end;
   end;
 
-
+  imdb_date := '';
 
   if not imdb_stv then
   begin
@@ -365,7 +367,7 @@ begin
 
     if rr.Exec(rlsdatesite) then
     begin
-      imdb_date := Format('%s %s', [rr.Match[2], rr.Match[3]]);
+      imdb_date := Format('%s %s', [Trim(rr.Match[2]), Trim(rr.Match[3])]);
       imdbdata.imdb_stvs := 'Cinedate: ' + imdb_date;
       imdbdata.imdb_stvm := False;
       imdb_stv := False;
@@ -405,13 +407,12 @@ begin
   end;
 
   s := '0';
+  imdb_screens := 0;
   (*  Get BOX/Business Infos  *)
-  businesssite := slUrlGet('http://www.imdb.com/title/' + imdb_id + '/business',
-    '');
+  businesssite := slUrlGet('http://www.imdb.com/title/' + imdb_id + '/business', '');
 
   rr.Expression := '\((USA|UK)\)[^\n]*?\(([\d\,\.]+)\s?Screens\)';
 
-  imdb_screens := 0;
   if rr.Exec(businesssite) then
   begin
     repeat
@@ -425,6 +426,47 @@ begin
       if StrToIntDef(s, 0) > imdb_screens then
         imdb_screens := StrToIntDef(s, 0)
     until not rr.ExecNext;
+  end;
+
+  if ((config.ReadBool(section, 'parse_boxofficemojo', False)) and (imdb_screens = 0)) then
+  begin
+    businesssite := slUrlGet('http://www.boxofficemojo.com/search/', 'q=' + imdb_mtitle);
+
+    rr.Expression := '<br><b>1 Movie Matches:\s*</b>';
+    if rr.Exec(businesssite) then
+    begin
+      rr2.Expression := '<td>\s*[^\n]*<b><font[^<>]*><a href="(/movies/[^<>]*)">[^<>]*</a></font></b></td>\s*(<td[^<>]*>[^\n]+\s*)+>([0-9,]+)</font></td>\s*<td[^<>]*><font[^<>]*|<a href="\/schedule[^\"]+">';
+    end
+    else
+    begin
+      bom_date := '[^<>]+' + IntToStr(imdb_year);
+      if imdb_date <> '' then
+      begin
+        {$IFDEF MSWINDOWS}
+          GetLocaleFormatSettings(1033, formatSettings);
+        {$ELSE}
+          formatSettings := DefaultFormatSettings;
+        {$ENDIF}
+        formatSettings.ShortDateFormat := 'd mmmm yyyy';
+        release_date := StrToDate(imdb_date, formatSettings);
+        formatSettings.ShortDateFormat := 'mm/dd/yyyy';
+        imdb_date := DateToStr(release_date, formatSettings);
+
+        if config.ReadBool(section, 'parse_boxofficemojo_exact', False) then
+          bom_date := imdb_date
+        else
+          bom_date := bom_date + '|' + imdb_date;
+      end;
+
+      rr2.Expression := '<td>\s*[^\n]*<b><font[^<>]*><a href="(/movies/[^<>]*)">[^<>]*</a></font></b></td>\s*(<td[^<>]*>[^\n]+\s*)+>([0-9,]+)</font></td>\s*<td[^<>]*><font[^<>]*|<a href="\/schedule[^\"]+">(' + bom_date + ')</a>';
+    end;
+
+    if rr2.Exec(businesssite) then
+    begin
+      s := Csere(rr2.Match[3], ',', '');
+      if StrToIntDef(s, 0) > imdb_screens then
+        imdb_screens := StrToIntDef(s, 0)
+    end;
   end;
 
   imdbdata.imdb_screens := imdb_screens;
@@ -524,4 +566,3 @@ begin
 end;
 
 end.
-
