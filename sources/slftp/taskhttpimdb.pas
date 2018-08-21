@@ -166,7 +166,7 @@ begin
 
   (*  Fetch Votes from iMDB *)
   // Trying newest iMDB layout from 24.09.2011 first
-  rr.Expression := '<span[^<>]*itemprop="ratingCount">(\S+)<\/span>';
+  rr.Expression := '<strong.*?on (\d+.*?\d+) user ratings\"><span>\d\.\d<\/span>';
   if rr.Exec(mainsite) then
   begin
     rr2.Expression := '[\.\,]';
@@ -205,7 +205,7 @@ begin
 
   (*  Fetch Rating from iMDB  *)
   // Trying newest iMDB layout from 24.09.2011 first
-  rr.Expression := '<span[^<>]*itemprop="ratingValue">(\d+\.\d+)<\/span>';
+  rr.Expression := '<strong.*?user ratings\"><span>(\d\.\d)<\/span>';
   if rr.Exec(mainsite) then
   begin
     rr2.Expression := '[\.\,]';
@@ -235,7 +235,7 @@ begin
 
   (* Rating/Votes combined occured on some of the newer layouts but vanished by now *)
   rr.Expression :=
-    '<div class="rating rating-big" [^<]+ title="Users rated this (\d+\.\d+)\/10 \((\d+(,\d+)?) votes\) - click stars to rate">';
+    '<div class="rating rating-\S+"[^<]+title="Users rated this (\d+[.,]\d+)\/10 \((\d+([.,]\d+)?) votes\) - click stars to rate"[^>]*>';
   if rr.Exec(mainsite) then
   begin
     rr2.Expression := '[\.\,]';
