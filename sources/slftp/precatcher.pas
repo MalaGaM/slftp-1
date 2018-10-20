@@ -456,7 +456,7 @@ begin
   genre := '';
   if ((event <> 'NEWDIR') and (FindSectionHandler(section).Name = 'TMP3Release')) then
   begin
-    genre := _findMP3GenreOnAnnounce(s, ts_data);
+    genre := _findMP3GenreOnAnnounce(StringReplace(s, rls, '', [rfReplaceAll, rfIgnoreCase]), ts_data);
     if genre <> '' then
     begin
       MyDebug('Genre: %s', [genre]);
